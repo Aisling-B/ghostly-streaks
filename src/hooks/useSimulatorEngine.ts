@@ -19,6 +19,9 @@ export interface SimState {
   showDayOverlay: boolean;
   currentInsight: Insight | null;
   history: DayLog[];
+  timerActive: boolean;
+  timeLeft: number; // in seconds
+  currentNotification: string | null;
 }
 
 export interface DayLog {
@@ -107,6 +110,11 @@ export function useSimulatorEngine() {
       };
     });
   }, [state.gameOver]);
+
+  const startExpiryTimer = useCallback(() => {
+  setState(s => ({ ...s, timerActive: true, timeLeft: 30 }));
+  // Logic to decrement timeLeft every second and call closeApp() at 0
+}, [closeApp]);
 
   return {
     state,
