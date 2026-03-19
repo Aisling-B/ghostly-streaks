@@ -76,6 +76,13 @@ const StreakSimulator = () => {
         </div>
       )}
 
+      {state.timerActive && (
+  <div className="absolute top-20 right-10 flex flex-col items-center animate-pulse">
+    <Hourglass className="w-10 h-10 text-destructive" />
+    <span className="text-destructive font-black text-xl">{state.timeLeft}s</span>
+  </div>
+)}
+
       {/* Header */}
       <header className="bg-snap-yellow px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-lg">👤</div><p className="text-primary-foreground font-black text-lg italic uppercase leading-none">Alex</p></div>
