@@ -59,33 +59,33 @@ export function useSimulatorEngine() {
 
   // Real-time Timer Logic
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: any;
     if (state.timerActive && state.timeLeft > 0 && !state.actionTakenToday && !state.gameOver) {
       interval = setInterval(() => {
         setState(s => ({ ...s, timeLeft: s.timeLeft - 1 }));
       }, 1000);
-    } else if (state.timeLeft === 0 && !state.actionTakenToday && !state.gameOver) {
-      // Auto-break streak if timer hits zero
-      closeApp();
+    } else if (state.timerActive && state.timeLeft === 0 && !state.actionTakenToday && !state.gameOver) {
+      // Auto-fail the day if timer hits zero
+      handleCloseApp();
     }
     return () => clearInterval(interval);
   }, [state.timerActive, state.timeLeft, state.actionTakenToday, state.gameOver]);
 
-  // Social Pressure Triggers
+  // Social Pressure Triggers on specific days
   useEffect(() => {
     const triggerDays = [2, 5, 7];
-    if (triggerDays.includes(state.currentDay) && !state.actionTakenToday && !state.timerActive && !state.showDayOverlay) {
+    if (triggerDays.includes(state.currentDay) && !state.actionTakenToday && !state.timerActive && !state.showDayOverlay && !state.gameOver) {
       setState(s => ({
         ...s,
         timerActive: true,
-        timeLeft: 20, // High pressure window
+        timeLeft: 30, 
         currentNotification: {
           title: "ALEX 👻",
           body: "DUDE the hourglass is up! Don't let it die! ⏳"
         }
       }));
     }
-  }, [state.currentDay, state.actionTakenToday, state.timerActive, state.showDayOverlay]);
+  }, [state.currentDay, state.actionTakenToday, state.timerActive, state.showDayOverlay, state.gameOver]);
 
   const sendGhost = useCallback(() => {
     setState(prev => ({
@@ -112,7 +112,7 @@ export function useSimulatorEngine() {
     }));
   }, []);
 
-  const closeApp = useCallback(() => {
+  const handleCloseApp = useCallback(() => {
     setState(prev => {
       const isBroken = !prev.actionTakenToday;
       const isLastDay = prev.currentDay >= totalDays;
@@ -125,16 +125,18 @@ export function useSimulatorEngine() {
         actionTakenToday: false,
         timerActive: false,
         showDayOverlay: !isLastDay && !isBroken,
-        currentNotification: null
+        currentNotification: null,
+        currentInsight: isBroken ? INSIGHTS.lossAversion : null
       };
     });
   }, []);
 
   return {
     state,
+    totalDays,
     sendGhost,
     sendRealTalk,
-    closeApp,
+    closeApp: handleCloseApp,
     dismissInsight: () => setState(s => ({ ...s, currentInsight: null })),
     dismissNotification: () => setState(s => ({ ...s, currentNotification: null })),
     dismissDayOverlay: () => setState(s => ({ ...s, showDayOverlay: false })),
