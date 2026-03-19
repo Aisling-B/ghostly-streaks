@@ -37,12 +37,12 @@ const INSIGHTS: Record<string, Insight> = {
   },
   realTalk: {
     title: "Connection vs. Maintenance",
-    body: "Real Talk builds intimacy but costs 5x more energy. This is why 15-24% of teen activity late at night is 'ghosting'—they are too tired to connect but too anxious to stop.",
+    body: "Real Talk builds intimacy but costs 5x more energy. 15-24% of late-night activity is 'ghosting'—teens are often too tired to connect but too anxious to stop.",
     source: ""
   },
   lossAversion: {
     title: "Loss Aversion",
-    body: "The pain of losing a 120-day streak is psychologically twice as powerful as the joy of starting one. This keeps you trapped in the loop.",
+    body: "The pain of losing a 120-day streak is psychologically twice as powerful as the joy of starting one. This fear keeps you trapped in the loop.",
     source: ""
   }
 };
@@ -62,8 +62,6 @@ const INITIAL_STATE: SimState = {
 
 export function useSimulatorEngine() {
   const [state, setState] = useState<SimState>(INITIAL_STATE);
-
-  const isBrainRotMode = state.mentalEnergy <= 0;
   const totalDays = 7;
 
   const sendGhost = useCallback(() => {
@@ -71,7 +69,7 @@ export function useSimulatorEngine() {
     setState((prev) => ({
       ...prev,
       streak: prev.streak + 1,
-      relationshipIntimacy: Math.max(0, prev.relationshipIntimacy - 8), // Increased penalty
+      relationshipIntimacy: Math.max(0, prev.relationshipIntimacy - 8),
       mentalEnergy: Math.max(0, prev.mentalEnergy - 10),
       actionTakenToday: true,
       currentInsight: INSIGHTS.ghost
@@ -79,67 +77,45 @@ export function useSimulatorEngine() {
   }, [state.actionTakenToday, state.gameOver]);
 
   const sendRealTalk = useCallback(() => {
-    if (state.actionTakenToday || state.gameOver || isBrainRotMode) return;
+    if (state.actionTakenToday || state.gameOver || state.mentalEnergy <= 20) return;
     setState((prev) => ({
       ...prev,
       streak: prev.streak + 1,
       relationshipIntimacy: Math.min(100, prev.relationshipIntimacy + 15),
-      mentalEnergy: Math.max(0, prev.mentalEnergy - 30), // Higher cost
+      mentalEnergy: Math.max(0, prev.mentalEnergy - 30),
       actionTakenToday: true,
       currentInsight: INSIGHTS.realTalk
     }));
-  }, [state.actionTakenToday, state.gameOver, isBrainRotMode]);
+  }, [state.actionTakenToday, state.gameOver, state.mentalEnergy]);
 
   const closeApp = useCallback(() => {
     if (state.gameOver) return;
     setState((prev) => {
-      const streakBroken = !prev.actionTakenToday;
-      if (streakBroken && !prev.currentInsight) {
-         // Optionally trigger loss aversion warning before actual break logic
-      }
-      const newStreak = streakBroken ? 0 : prev.streak;
-      const log: DayLog = {
-        day: prev.currentDay,
-        action: prev.actionTakenToday ? "ghost" : null,
-        streak: newStreak,
-        intimacy: prev.relationshipIntimacy,
-        energy: prev.mentalEnergy,
-      };
+      const isBroken = !prev.actionTakenToday;
+      const newStreak = isBroken ? 0 : prev.streak;
       const isLastDay = prev.currentDay >= totalDays;
+      
       return {
         ...prev,
         streak: newStreak,
-        streakBroken: streakBroken || prev.streakBroken,
+        streakBroken: isBroken,
         currentDay: isLastDay ? prev.currentDay : prev.currentDay + 1,
         actionTakenToday: false,
-        gameOver: isLastDay || streakBroken,
-        showDayOverlay: !isLastDay && !streakBroken,
-        history: [...prev.history, log],
+        gameOver: isLastDay || isBroken,
+        showDayOverlay: !isLastDay && !isBroken,
+        history: [...prev.history, { day: prev.currentDay, action: prev.actionTakenToday ? "ghost" : null, streak: newStreak, intimacy: prev.relationshipIntimacy, energy: prev.mentalEnergy }],
       };
     });
   }, [state.gameOver]);
 
-  const dismissInsight = useCallback(() => {
-    setState((prev) => ({ ...prev, currentInsight: null }));
-  }, []);
-
-  const dismissDayOverlay = useCallback(() => {
-    setState((prev) => ({ ...prev, showDayOverlay: false }));
-  }, []);
-
-  const restart = useCallback(() => {
-    setState(INITIAL_STATE);
-  }, []);
-
   return {
     state,
-    isBrainRotMode,
     totalDays,
     sendGhost,
     sendRealTalk,
     closeApp,
-    dismissDayOverlay,
-    dismissInsight,
-    restart,
+    dismissInsight: () => setState(s => ({ ...s, currentInsight: null })),
+    dismissDayOverlay: () => setState(s => ({ ...s, showDayOverlay: false })),
+    restart: () => setState(INITIAL_STATE)
   };
 }
