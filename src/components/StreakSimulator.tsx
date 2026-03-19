@@ -1,95 +1,232 @@
 import { useSimulatorEngine } from "@/hooks/useSimulatorEngine";
-import { Camera, MessageCircle, Ghost, Brain, Heart, Hourglass, AlertCircle } from "lucide-react";
-
+import { useEffect } from "react";
+import { Camera, MessageCircle, X, RotateCcw, Ghost, Brain, Heart, Zap } from "lucide-react";
 const StreakSimulator = () => {
-  const { state, sendMaintenance, sendConnection, closeApp, restart } = useSimulatorEngine();
-
-  const renderSnapContent = () => {
-    switch (state.activeSnap) {
-      case "ceiling": return <div className="w-full h-full bg-slate-800 flex items-center justify-center text-white/20 font-black text-9xl">S</div>;
-      case "shoes": return <div className="w-full h-full bg-stone-700 flex items-center justify-center text-white/20 font-black text-9xl">S</div>;
-      case "floor": return <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-white/20 font-black text-9xl">S</div>;
-      case "genuine": return <div className="w-full h-full bg-snap-blue/10 flex items-center justify-center text-snap-blue font-bold p-8 text-center italic">"Actually had a great day today, Alex..."</div>;
-      default: return <Ghost className="w-24 h-24 text-muted-foreground/10" />;
+  const {
+    state,
+    isBrainRotMode,
+    totalDays,
+    sendGhost,
+    sendRealTalk,
+    closeApp,
+    dismissDayOverlay,
+    restart,
+  } = useSimulatorEngine();
+  useEffect(() => {
+    if (state.showDayOverlay) {
+      const timer = setTimeout(dismissDayOverlay, 2000);
+      return () => clearTimeout(timer);
     }
-  };
-
+  }, [state.showDayOverlay, state.currentDay, dismissDayOverlay]);
+  const energyPct = state.mentalEnergy / 100;
+  const isExhausted = state.mentalEnergy <= 20;
   return (
-    <div className={`relative flex flex-col min-h-screen max-w-md mx-auto bg-background transition-all ${state.mentalEnergy < 30 ? "grayscale brightness-75" : ""}`}>
-      
-      {state.notification && (
-        <div className={`absolute top-4 inset-x-4 z-[100] bg-white shadow-2xl rounded-2xl p-4 border-l-4 ${state.notification.type === 'guilt' ? 'border-destructive' : 'border-snap-yellow'} animate-in slide-in-from-top-full`}>
-          <div className="flex gap-3">
-            <div className="w-10 h-10 bg-snap-yellow rounded-full flex items-center justify-center text-white font-bold">A</div>
-            <div className="flex-1 text-left">
-              <p className="text-[10px] font-black text-snap-yellow uppercase">{state.notification.title}</p>
-              <p className="text-sm font-bold text-slate-800 mt-1 italic leading-tight">"{state.notification.body}"</p>
-            </div>
+    <div
+      className={`relative flex flex-col min-h-screen max-w-md mx-auto overflow-hidden ${
+        isExhausted ? "grayscale-exhausted" : ""
+      } ${isBrainRotMode ? "animate-flicker" : ""}`}
+    >
+      {/* Day Overlay */}
+      {state.showDayOverlay && !state.gameOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/95">
+          <div className="animate-day-overlay text-center">
+            <p className="text-snap-yellow text-7xl font-bold tracking-tight">
+              DAY {state.currentDay}
+            </p>
+            <p className="text-muted-foreground text-lg mt-2">OF {totalDays}</p>
           </div>
         </div>
       )}
-
-      <header className="bg-snap-yellow px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 font-black italic text-white">ALEX</div>
-        <div className={`flex items-center gap-2 rounded-full px-4 py-2 ${state.timerActive ? 'bg-destructive animate-pulse' : 'bg-black/10'}`}>
-          {state.timerActive && <span className="text-white font-black text-xs">{state.timeLeft}s</span>}
-          <span className="text-xl">🔥</span><span className="text-white font-black text-2xl tracking-tighter">{state.streak}</span>
+      {/* Game Over Screen */}
+      {state.gameOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/98">
+          <div className="text-center px-8 animate-slide-up">
+            {state.streakBroken ? (
+              <>
+                <p className="text-6xl mb-4">💔</p>
+                <h2 className="text-destructive text-3xl font-bold mb-2">STREAK LOST</h2>
+                <p className="text-muted-foreground mb-6">
+                  You chose rest over the number. The 🔥 is gone.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-6xl mb-4">🔥</p>
+                <h2 className="text-snap-yellow text-3xl font-bold mb-2">
+                  {state.streak}-DAY STREAK
+                </h2>
+                <p className="text-muted-foreground mb-2">But at what cost?</p>
+              </>
+            )}
+            <div className="bg-card rounded-lg p-6 mt-6 space-y-4 text-left">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-intimacy" /> Relationship
+                </span>
+                <span className={`font-bold text-lg ${
+                  state.relationshipIntimacy <= 20 ? "text-destructive" : "text-intimacy"
+                }`}>
+                  {state.relationshipIntimacy}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-energy" /> Mental Energy
+                </span>
+                <span className={`font-bold text-lg ${
+                  state.mentalEnergy <= 20 ? "text-destructive" : "text-energy"
+                }`}>
+                  {state.mentalEnergy}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  🔥 Streak
+                </span>
+                <span className="font-bold text-lg text-snap-yellow">
+                  {state.streak} days
+                </span>
+              </div>
+            </div>
+            {!state.streakBroken && state.relationshipIntimacy <= 20 && (
+              <p className="text-destructive text-sm mt-4 italic">
+                "127-day streak. 0% real connection. Was it worth it?"
+              </p>
+            )}
+            <button
+              onClick={restart}
+              className="mt-8 flex items-center gap-2 mx-auto bg-snap-yellow text-primary-foreground px-6 py-3 rounded-full font-bold text-lg hover:opacity-90 transition-opacity"
+            >
+              <RotateCcw className="w-5 h-5" /> Try Again
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Header - Snapchat style */}
+      <header className="bg-snap-yellow px-4 py-3 flex items-center justify-between">
+        <button className="text-primary-foreground">
+          <X className="w-6 h-6" />
+        </button>
+        <div className="text-center">
+          <p className="text-primary-foreground font-bold text-lg">Alex 👻</p>
+          <p className="text-primary-foreground/70 text-xs">Tap to chat</p>
+        </div>
+        <div className="flex items-center gap-1 bg-primary-foreground/20 rounded-full px-3 py-1">
+          <span className="text-lg">🔥</span>
+          <span className="text-primary-foreground font-bold text-xl">{state.streak}</span>
         </div>
       </header>
-
-      <div className="p-6 space-y-4 bg-card border-b">
-        <div className="space-y-1 text-left">
-          <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground">
-            <span><Brain className="inline w-3 h-3 mr-1" /> Cognitive Energy</span>
-            <span>{state.mentalEnergy}%</span>
+      {/* Status Bars */}
+      <div className="px-4 py-3 space-y-2 bg-card">
+        <div className="flex items-center gap-3">
+          <Brain className="w-4 h-4 text-energy shrink-0" />
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${state.mentalEnergy}%`,
+                backgroundColor: state.mentalEnergy > 40
+                  ? "hsl(var(--energy-green))"
+                  : state.mentalEnergy > 20
+                  ? "hsl(59 100% 50%)"
+                  : "hsl(var(--destructive))",
+              }}
+            />
           </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-energy transition-all" style={{ width: `${state.mentalEnergy}%` }} /></div>
+          <span className="text-xs text-muted-foreground w-8">{state.mentalEnergy}%</span>
         </div>
-        <div className="space-y-1 text-left">
-          <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground">
-            <span><AlertCircle className="inline w-3 h-3 mr-1 text-destructive" /> Obligation</span>
-            <span>{state.obligation}%</span>
+        <div className="flex items-center gap-3">
+          <Heart className="w-4 h-4 text-intimacy shrink-0" />
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${state.relationshipIntimacy}%`,
+                backgroundColor: state.relationshipIntimacy > 40
+                  ? "hsl(var(--intimacy-pink))"
+                  : "hsl(var(--destructive))",
+              }}
+            />
           </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-destructive transition-all" style={{ width: `${state.obligation}%` }} /></div>
+          <span className="text-xs text-muted-foreground w-8">{state.relationshipIntimacy}%</span>
         </div>
       </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-black/5">
-        {renderSnapContent()}
-      </div>
-
-      <div className="p-6 pb-12 bg-background border-t space-y-4">
-        {!state.actionTakenToday && (
-          <div className="grid grid-cols-2 gap-4">
-            <button onClick={sendMaintenance} className="flex flex-col items-center gap-2 p-5 bg-snap-purple/10 border-2 border-snap-purple/20 rounded-3xl active:scale-95 transition-all">
-              <Camera className="w-8 h-8 text-snap-purple" />
-              <span className="text-[10px] font-black uppercase">Maintenance</span>
-            </button>
-            <button onClick={sendConnection} disabled={state.mentalEnergy < 35} className="flex flex-col items-center gap-2 p-5 rounded-3xl active:scale-95 transition-all bg-snap-blue/10 border-2 border-snap-blue/20 disabled:opacity-20">
-              <MessageCircle className="w-8 h-8 text-snap-blue" />
-              <span className="text-[10px] font-black uppercase">Genuine Talk</span>
-            </button>
-          </div>
-        )}
-        <button onClick={closeApp} className="w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 border-destructive/20 text-destructive">
-          {state.actionTakenToday ? `Finish Day ${state.currentDay} →` : `ABANDON 120-DAY INVESTMENT (💔)`}
-        </button>
-      </div>
-
-      {state.gameOver && (
-        <div className="absolute inset-0 z-[200] bg-background p-10 flex flex-col items-center justify-center text-center">
-          <span className="text-7xl mb-4">{state.streakBroken ? "💔" : "🔥"}</span>
-          <h2 className="text-4xl font-black italic uppercase leading-none">{state.streakBroken ? "Broken Loop" : "Goal Met?"}</h2>
-          <div className="bg-card border-2 p-6 rounded-3xl w-full my-8 text-left space-y-4">
-             <p className="text-[11px] text-muted-foreground italic leading-relaxed">
-               "Teenagers open this app average 841 times a month just to protect a number. By Day 7, your friendship is a metagame." [cite: 140, 724]
-             </p>
-          </div>
-          <button onClick={restart} className="w-full bg-snap-yellow text-white py-5 rounded-2xl font-black uppercase shadow-xl transition-transform">Restart Loop</button>
+      {/* Brain Rot Warning */}
+      {isBrainRotMode && (
+        <div className="mx-4 mt-2 bg-destructive/20 border border-destructive/40 rounded-lg p-3 animate-glitch">
+          <p className="text-destructive text-sm font-bold text-center flex items-center justify-center gap-2">
+            <Zap className="w-4 h-4" /> BRAIN ROT MODE — Real Talk disabled
+          </p>
         </div>
       )}
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+        <div className={`text-center transition-all duration-700 ${isExhausted ? "animate-glitch" : ""}`}>
+          <Ghost className="w-20 h-20 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground text-sm">
+            {state.actionTakenToday
+              ? "✅ Streak maintained for today."
+              : isBrainRotMode
+              ? "You're exhausted. Just send the snap..."
+              : "What will you send Alex today?"}
+          </p>
+          <p className="text-muted-foreground/50 text-xs mt-2">
+            Day {state.currentDay} of {totalDays}
+          </p>
+        </div>
+      </div>
+      {/* Action Bar */}
+      <div className="p-4 pb-8 bg-card border-t border-border space-y-3">
+        {!state.actionTakenToday && !state.gameOver ? (
+          <div className="flex gap-3">
+            {/* Send Ghost */}
+            <button
+              onClick={sendGhost}
+              className="flex-1 flex flex-col items-center gap-2 bg-snap-purple/20 border border-snap-purple/40 rounded-2xl py-4 px-3 hover:bg-snap-purple/30 transition-colors active:scale-95"
+            >
+              <div className="w-12 h-12 bg-snap-purple rounded-lg flex items-center justify-center">
+                <Camera className="w-6 h-6 text-foreground" />
+              </div>
+              <span className="text-xs font-semibold text-foreground">Send Ghost</span>
+              <span className="text-[10px] text-muted-foreground">🔥+1 · 💔-5 · ⚡-5</span>
+            </button>
+            {/* Real Talk */}
+            <button
+              onClick={sendRealTalk}
+              disabled={isBrainRotMode}
+              className={`flex-1 flex flex-col items-center gap-2 rounded-2xl py-4 px-3 transition-colors active:scale-95 ${
+                isBrainRotMode
+                  ? "bg-muted/30 border border-muted opacity-40 cursor-not-allowed"
+                  : "bg-snap-blue/20 border border-snap-blue/40 hover:bg-snap-blue/30"
+              }`}
+            >
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                isBrainRotMode ? "bg-muted" : "bg-snap-blue"
+              }`}>
+                <MessageCircle className="w-6 h-6 text-foreground" />
+              </div>
+              <span className="text-xs font-semibold text-foreground">Real Talk</span>
+              <span className="text-[10px] text-muted-foreground">🔥+1 · ❤️+15 · ⚡-25</span>
+            </button>
+          </div>
+        ) : null}
+        {/* Close App / Next Day */}
+        {!state.gameOver && (
+          <button
+            onClick={closeApp}
+            className={`w-full py-3 rounded-full font-bold text-sm transition-all ${
+              state.actionTakenToday
+                ? "bg-snap-yellow text-primary-foreground hover:opacity-90"
+                : "bg-destructive/20 text-destructive border border-destructive/40 hover:bg-destructive/30"
+            }`}
+          >
+            {state.actionTakenToday
+              ? `End Day ${state.currentDay} →`
+              : `Close App (💔 Lose ${state.streak}-day streak)`}
+          </button>
+        )}
+      </div>
     </div>
   );
 };
-
 export default StreakSimulator;
