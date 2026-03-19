@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export type ActionType = "ghost" | "realTalk" | "closeApp";
 
@@ -18,29 +18,16 @@ export interface SimState {
   streakBroken: boolean;
   showDayOverlay: boolean;
   currentInsight: Insight | null;
-  history: DayLog[];
+  currentNotification: { title: string; body: string } | null;
   timerActive: boolean;
-  timeLeft: number; // in seconds
-  currentNotification: string | null;
-}
-
-export interface DayLog {
-  day: number;
-  action: ActionType | null;
-  streak: number;
-  intimacy: number;
-  energy: number;
+  timeLeft: number;
+  history: any[];
 }
 
 const INSIGHTS: Record<string, Insight> = {
   ghost: {
     title: "The Maintenance Chore",
     body: "Sending a 'blank' snap is a behavioral chore. You aren't connecting with Alex; you're just servicing a number so it doesn't disappear.",
-    source: ""
-  },
-  realTalk: {
-    title: "Connection vs. Maintenance",
-    body: "Real Talk builds intimacy but costs 5x more energy. 15-24% of late-night activity is 'ghosting'—teens are often too tired to connect but too anxious to stop.",
     source: ""
   },
   lossAversion: {
@@ -60,6 +47,9 @@ const INITIAL_STATE: SimState = {
   streakBroken: false,
   showDayOverlay: true,
   currentInsight: null,
+  currentNotification: null,
+  timerActive: false,
+  timeLeft: 30,
   history: [],
 };
 
@@ -67,62 +57,86 @@ export function useSimulatorEngine() {
   const [state, setState] = useState<SimState>(INITIAL_STATE);
   const totalDays = 7;
 
+  // Real-time Timer Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (state.timerActive && state.timeLeft > 0 && !state.actionTakenToday && !state.gameOver) {
+      interval = setInterval(() => {
+        setState(s => ({ ...s, timeLeft: s.timeLeft - 1 }));
+      }, 1000);
+    } else if (state.timeLeft === 0 && !state.actionTakenToday && !state.gameOver) {
+      // Auto-break streak if timer hits zero
+      closeApp();
+    }
+    return () => clearInterval(interval);
+  }, [state.timerActive, state.timeLeft, state.actionTakenToday, state.gameOver]);
+
+  // Social Pressure Triggers
+  useEffect(() => {
+    const triggerDays = [2, 5, 7];
+    if (triggerDays.includes(state.currentDay) && !state.actionTakenToday && !state.timerActive && !state.showDayOverlay) {
+      setState(s => ({
+        ...s,
+        timerActive: true,
+        timeLeft: 20, // High pressure window
+        currentNotification: {
+          title: "ALEX 👻",
+          body: "DUDE the hourglass is up! Don't let it die! ⏳"
+        }
+      }));
+    }
+  }, [state.currentDay, state.actionTakenToday, state.timerActive, state.showDayOverlay]);
+
   const sendGhost = useCallback(() => {
-    if (state.actionTakenToday || state.gameOver) return;
-    setState((prev) => ({
+    setState(prev => ({
       ...prev,
       streak: prev.streak + 1,
       relationshipIntimacy: Math.max(0, prev.relationshipIntimacy - 8),
       mentalEnergy: Math.max(0, prev.mentalEnergy - 10),
       actionTakenToday: true,
-      currentInsight: INSIGHTS.ghost
+      currentInsight: INSIGHTS.ghost,
+      currentNotification: null,
+      timerActive: false
     }));
-  }, [state.actionTakenToday, state.gameOver]);
+  }, []);
 
   const sendRealTalk = useCallback(() => {
-    if (state.actionTakenToday || state.gameOver || state.mentalEnergy <= 20) return;
-    setState((prev) => ({
+    setState(prev => ({
       ...prev,
       streak: prev.streak + 1,
       relationshipIntimacy: Math.min(100, prev.relationshipIntimacy + 15),
       mentalEnergy: Math.max(0, prev.mentalEnergy - 30),
       actionTakenToday: true,
-      currentInsight: INSIGHTS.realTalk
+      currentNotification: null,
+      timerActive: false
     }));
-  }, [state.actionTakenToday, state.gameOver, state.mentalEnergy]);
+  }, []);
 
   const closeApp = useCallback(() => {
-    if (state.gameOver) return;
-    setState((prev) => {
+    setState(prev => {
       const isBroken = !prev.actionTakenToday;
-      const newStreak = isBroken ? 0 : prev.streak;
       const isLastDay = prev.currentDay >= totalDays;
-      
       return {
         ...prev,
-        streak: newStreak,
+        streak: isBroken ? 0 : prev.streak,
         streakBroken: isBroken,
+        gameOver: isLastDay || isBroken,
         currentDay: isLastDay ? prev.currentDay : prev.currentDay + 1,
         actionTakenToday: false,
-        gameOver: isLastDay || isBroken,
+        timerActive: false,
         showDayOverlay: !isLastDay && !isBroken,
-        history: [...prev.history, { day: prev.currentDay, action: prev.actionTakenToday ? "ghost" : null, streak: newStreak, intimacy: prev.relationshipIntimacy, energy: prev.mentalEnergy }],
+        currentNotification: null
       };
     });
-  }, [state.gameOver]);
-
-  const startExpiryTimer = useCallback(() => {
-  setState(s => ({ ...s, timerActive: true, timeLeft: 30 }));
-  // Logic to decrement timeLeft every second and call closeApp() at 0
-}, [closeApp]);
+  }, []);
 
   return {
     state,
-    totalDays,
     sendGhost,
     sendRealTalk,
     closeApp,
     dismissInsight: () => setState(s => ({ ...s, currentInsight: null })),
+    dismissNotification: () => setState(s => ({ ...s, currentNotification: null })),
     dismissDayOverlay: () => setState(s => ({ ...s, showDayOverlay: false })),
     restart: () => setState(INITIAL_STATE)
   };
