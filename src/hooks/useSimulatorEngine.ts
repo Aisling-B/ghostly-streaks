@@ -13,8 +13,7 @@ export interface SimState {
   showDayOverlay: boolean;
   timerActive: boolean;
   timeLeft: number;
-  notification: { title: string; body: string; type: ActionType } | null;
-  history: any[];
+  notification: { title: string; body: string; type: 'pressure' | 'intimacy' } | null;
 }
 
 const INITIAL_STATE: SimState = {
@@ -27,15 +26,14 @@ const INITIAL_STATE: SimState = {
   streakBroken: false,
   showDayOverlay: true,
   timerActive: false,
-  timeLeft: 30,
+  timeLeft: 20,
   notification: null,
-  history: [],
 };
 
 export function useSimulatorEngine() {
   const [state, setState] = useState<SimState>(INITIAL_STATE);
 
-  // Timer Logic: Auto-break streak if time runs out
+  // Auto-triggering the Hourglass pressure
   useEffect(() => {
     let interval: any;
     if (state.timerActive && state.timeLeft > 0 && !state.actionTakenToday) {
@@ -48,20 +46,19 @@ export function useSimulatorEngine() {
     return () => clearInterval(interval);
   }, [state.timerActive, state.timeLeft, state.actionTakenToday]);
 
-  // Story Trigger: Random urgency notifications
+  // Narrative Triggers based on Day
   useEffect(() => {
     if (state.showDayOverlay || state.actionTakenToday || state.notification) return;
-    
-    const triggerStory = () => {
-      const stories = [
-        { title: "ALEX 👻", body: "Sending my streaks! Don't let it die! ⏳", type: "ghost" as ActionType },
-        { title: "ALEX 💬", body: "I've had a really bad day, can we talk?", type: "realTalk" as ActionType }
-      ];
-      const selected = stories[Math.floor(Math.random() * stories.length)];
-      setState(s => ({ ...s, notification: selected, timerActive: true, timeLeft: 20 }));
+
+    const triggerNarrative = () => {
+      if (state.currentDay === 2) {
+        setState(s => ({ ...s, notification: { title: "ALEX 🔥", body: "Send a snap! My hourglass is up! ⏳", type: 'pressure' }, timerActive: true }));
+      } else if (state.currentDay === 4) {
+        setState(s => ({ ...s, notification: { title: "ALEX 💬", body: "Can we actually talk? I've had a rough day.", type: 'intimacy' }, timerActive: true, timeLeft: 15 }));
+      }
     };
 
-    const timeout = setTimeout(triggerStory, 3000);
+    const timeout = setTimeout(triggerNarrative, 3000);
     return () => clearTimeout(timeout);
   }, [state.currentDay, state.actionTakenToday, state.showDayOverlay, state.notification]);
 
@@ -69,7 +66,7 @@ export function useSimulatorEngine() {
     setState(s => ({
       ...s,
       streak: s.streak + 1,
-      relationshipIntimacy: Math.max(0, s.relationshipIntimacy - 5),
+      relationshipIntimacy: Math.max(0, s.relationshipIntimacy - 10),
       mentalEnergy: Math.max(0, s.mentalEnergy - 10),
       actionTakenToday: true,
       timerActive: false,
@@ -78,16 +75,18 @@ export function useSimulatorEngine() {
   }, []);
 
   const sendRealTalk = useCallback(() => {
+    // Cumulative fatigue: Real talk gets harder every day
+    const difficultyMultiplier = 1 + (state.currentDay * 0.2); 
     setState(s => ({
       ...s,
       streak: s.streak + 1,
       relationshipIntimacy: Math.min(100, s.relationshipIntimacy + 15),
-      mentalEnergy: Math.max(0, s.mentalEnergy - 30),
+      mentalEnergy: Math.max(0, s.mentalEnergy - (25 * difficultyMultiplier)),
       actionTakenToday: true,
       timerActive: false,
       notification: null
     }));
-  }, []);
+  }, [state.currentDay]);
 
   const handleCloseApp = useCallback(() => {
     setState(prev => {
@@ -102,7 +101,8 @@ export function useSimulatorEngine() {
         actionTakenToday: false,
         timerActive: false,
         showDayOverlay: !isLastDay && !isBroken,
-        notification: null
+        notification: null,
+        mentalEnergy: Math.min(100, prev.mentalEnergy + 20) // Only partial recovery
       };
     });
   }, []);
